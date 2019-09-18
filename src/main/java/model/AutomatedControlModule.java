@@ -46,12 +46,8 @@ public class AutomatedControlModule {
                 if(stop)
                     return;
 
-                if(removeDestinationIfReached()) {
-                    elevatorCabin.openDoor();
-                    elevatorCabin.closeDoor();
-                }
-
-                if(removeSameDirectionOutsideCallIfReached()) {
+                //TODO chek this
+                if(removeDestinationIfReached() | removeSameDirectionOutsideCallIfReached()) {
                     elevatorCabin.openDoor();
                     elevatorCabin.closeDoor();
                 }
