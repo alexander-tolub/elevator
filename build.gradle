@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group 'prinkle'
+group 'sprinkle'
 version '1.0-SNAPSHOT'
 
 sourceCompatibility = 1.8
