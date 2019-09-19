@@ -2,11 +2,17 @@ package model;
 
 public class Motor {
 
+    private int speedPerSecond;
+
+    public Motor(int speedPerSecond) {
+        this.speedPerSecond = speedPerSecond;
+    }
+
     public int up() {
         try {
             System.out.println("going up 1 meter");
             Thread.sleep(1000);
-            return 1;
+            return speedPerSecond;
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -17,7 +23,7 @@ public class Motor {
         try {
             System.out.println("going down 1 meter");
             Thread.sleep(1000);
-            return 1;
+            return speedPerSecond;
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

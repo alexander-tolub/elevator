@@ -6,6 +6,7 @@ public class AutomatedControlModule {
 
     private final int floorHeight;
     private double cabinDistanceFromGround = 0;
+    private int floorCount;
     private ElevatorCabin elevatorCabin;
     private Motor motor;
     private Set<CallFromOutsideCabin> callFromOutsideCabinSet = new HashSet<>();
@@ -13,13 +14,15 @@ public class AutomatedControlModule {
 
     private boolean stop = false;
 
-    public AutomatedControlModule(int floorHeight) {
+    public AutomatedControlModule(int floorHeight, int motorSpeed, int floorCount) {
         this.floorHeight = floorHeight;
         this.elevatorCabin = new ElevatorCabin();
-        this.motor  = new Motor();
+        this.motor = new Motor(motorSpeed);
+        this.floorCount = floorCount;
     }
 
     public void addCallFromOutsideCabin(CallFromOutsideCabin callFromOutside) {
+        System.out.println("registering call from outside the cabin " + callFromOutside);
         callFromOutsideCabinSet.add(callFromOutside);
     }
 
@@ -28,59 +31,72 @@ public class AutomatedControlModule {
     }
 
     public void stop() {
-        if(stop) {
+        if (stop) {
             stop = false;
             startWorking();
         }
     }
 
-    // на первом шаге лифт стоит и не двигается, в стеке заданых этажей заранее вбиты дестинейшны
-    // в листе вывзовов лифта имеем предзаполненный список вызовов пасажиров на этажах
-    // если стек дестинейшнов пуст (НО ОН НЕ ПУСТ!!!), находим ближайший вызов на этаже, и едем туда
     public void startWorking() {
-        new Thread(() -> {
-            while(true) {
-                if(stop)
-                    return;
+        while (true) {
+            if (stop)
+                return;
 
-                //TODO chek this
-                if(removeDestinationIfReached() | removeSameDirectionOutsideCallIfReached()) {
-                    elevatorCabin.openDoor();
-                    elevatorCabin.closeDoor();
-                }
+            System.out.println("current floor is " + (int) calculateCurrentFloor());
 
-                if(calculateCurrentDirection().equals(Direction.UP)) {
-                    cabinDistanceFromGround =+ motor.up();
-                }
-                if(calculateCurrentDirection().equals(Direction.DOWN)) {
-                    cabinDistanceFromGround =+ motor.down();
-                }
+            boolean destinationReached = removeDestinationIfReached();
+            CallFromOutsideCabin sameDirectionOutsideCallReached = removeSameDirectionOutsideCallIfReached();
 
+            if (sameDirectionOutsideCallReached != null)
+                callFromWithinCabinQueue.add(new CallFromWithinCabin(sameDirectionOutsideCallReached.getDestinationFloor()));
+
+            if (destinationReached || (sameDirectionOutsideCallReached != null)) {
+                elevatorCabin.openDoor();
+                if (destinationReached) {
+                    System.out.println("destination reached, dropping passenger");
+                }
+                if (sameDirectionOutsideCallReached != null) {
+                    System.out.println("picking up a passenger");
+                }
+                elevatorCabin.closeDoor();
+            }
+            if(callFromOutsideCabinSet.isEmpty() && callFromWithinCabinQueue.isEmpty()) {
+                System.out.println("all done");
+                return;
             }
 
-        }).start();
-    }
-
-    private boolean removeSameDirectionOutsideCallIfReached() {
-        if(isCabinLevel()) {
-            CallFromOutsideCabin callFromOutsideCabinUp = new CallFromOutsideCabin(Direction.UP, (int) calculateCurrentFloor());
-            CallFromOutsideCabin callFromOutsideCabinDown = new CallFromOutsideCabin(Direction.DOWN, (int) calculateCurrentFloor());
-            if(calculateCurrentDirection() == null && ) {
-
+            if ((calculateCurrentDirection() != null) && calculateCurrentDirection().equals(Direction.UP)) {
+                cabinDistanceFromGround += motor.up();
             }
-            if(callFromOutsideCabinSet.contains(callFromOutsideCabinUp) && calculateCurrentDirection().equals(Direction.UP)) {
-                callFromOutsideCabinSet.remove(callFromOutsideCabinUp);
-                return true;
-            } else if(callFromOutsideCabinSet.contains(callFromOutsideCabinDown) && calculateCurrentDirection().equals(Direction.DOWN)) {
-                callFromOutsideCabinSet.remove(callFromOutsideCabinDown);
-                return true;
+            if ((calculateCurrentDirection() != null) && calculateCurrentDirection().equals(Direction.DOWN)) {
+                cabinDistanceFromGround -= motor.down();
             }
         }
-        return false;
+    }
+
+    private CallFromOutsideCabin removeSameDirectionOutsideCallIfReached() {
+        if (isCabinLevel()) {
+            for (int i = 1; i <= floorCount; i++) {
+                CallFromOutsideCabin callFromOutsideCabinUp = new CallFromOutsideCabin(Direction.UP, (int) calculateCurrentFloor(), i);
+                CallFromOutsideCabin callFromOutsideCabinDown = new CallFromOutsideCabin(Direction.DOWN, (int) calculateCurrentFloor(), i);
+                if (callFromWithinCabinQueue.isEmpty() && callFromOutsideCabinSet.contains(callFromOutsideCabinUp)) {
+                    callFromOutsideCabinSet.remove(callFromOutsideCabinUp);
+                    return callFromOutsideCabinUp;
+                }
+                if (callFromOutsideCabinSet.contains(callFromOutsideCabinUp) && calculateCurrentDirection().equals(Direction.UP)) {
+                    callFromOutsideCabinSet.remove(callFromOutsideCabinUp);
+                    return callFromOutsideCabinUp;
+                } else if (callFromOutsideCabinSet.contains(callFromOutsideCabinDown) && calculateCurrentDirection().equals(Direction.DOWN)) {
+                    callFromOutsideCabinSet.remove(callFromOutsideCabinDown);
+                    return callFromOutsideCabinDown;
+                }
+            }
+        }
+        return null;
     }
 
     private boolean removeDestinationIfReached() {
-        if(isCabinLevel()) {
+        if (isCabinLevel()) {
             CallFromWithinCabin callFromWithinCabin = new CallFromWithinCabin((int) calculateCurrentFloor());
             return callFromWithinCabinQueue.remove(callFromWithinCabin);
         } else {
@@ -90,8 +106,10 @@ public class AutomatedControlModule {
 
     private Direction calculateCurrentDirection() {
         CallFromWithinCabin floor = null;
-        if(!callFromWithinCabinQueue.isEmpty()) {
+        if (!callFromWithinCabinQueue.isEmpty()) {
             floor = callFromWithinCabinQueue.iterator().next();
+            if ((calculateFloorDistanceFromGround(floor.getSelectedFloor()) - cabinDistanceFromGround) == 0)
+                return null;
             return (calculateFloorDistanceFromGround(floor.getSelectedFloor()) - cabinDistanceFromGround) > 0 ? Direction.UP : Direction.DOWN;
         }
         return (calculateFloorDistanceFromGround(findClosestCallFromOutside().getFloor()) - cabinDistanceFromGround) > 0 ? Direction.UP : Direction.DOWN;
@@ -100,9 +118,9 @@ public class AutomatedControlModule {
     private CallFromOutsideCabin findClosestCallFromOutside() {
         int distance = Integer.MAX_VALUE;
         CallFromOutsideCabin result = null;
-        for(CallFromOutsideCabin callFromOutsideCabin : callFromOutsideCabinSet) {
+        for (CallFromOutsideCabin callFromOutsideCabin : callFromOutsideCabinSet) {
             int distanceTillOutsideCall = callFromOutsideCabin.getDestinationFloor() - (int) calculateCurrentFloor();
-            if(Math.abs(distanceTillOutsideCall) < distance)
+            if (Math.abs(distanceTillOutsideCall) < distance)
                 result = callFromOutsideCabin;
         }
         return result;
@@ -113,11 +131,11 @@ public class AutomatedControlModule {
     }
 
     private double calculateCurrentFloor() {
-        return cabinDistanceFromGround / floorHeight;
+        return (cabinDistanceFromGround / floorHeight) + 1;
     }
 
     private double calculateFloorDistanceFromGround(int floor) {
-        return floor * floorHeight;
+        return (floor - 1) * floorHeight;
     }
 
 }
