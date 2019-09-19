@@ -1,9 +1,6 @@
 package model;
 
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 public class AutomatedControlModule {
 
@@ -12,7 +9,7 @@ public class AutomatedControlModule {
     private ElevatorCabin elevatorCabin;
     private Motor motor;
     private Set<CallFromOutsideCabin> callFromOutsideCabinSet = new HashSet<>();
-    private Queue<CallFromWithinCabin> callFromWithinCabinQueue = new LinkedList<>();
+    private LinkedHashSet<CallFromWithinCabin> callFromWithinCabinQueue = new LinkedHashSet<>();
 
     private boolean stop = false;
 
@@ -68,6 +65,9 @@ public class AutomatedControlModule {
         if(isCabinLevel()) {
             CallFromOutsideCabin callFromOutsideCabinUp = new CallFromOutsideCabin(Direction.UP, (int) calculateCurrentFloor());
             CallFromOutsideCabin callFromOutsideCabinDown = new CallFromOutsideCabin(Direction.DOWN, (int) calculateCurrentFloor());
+            if(calculateCurrentDirection() == null && ) {
+
+            }
             if(callFromOutsideCabinSet.contains(callFromOutsideCabinUp) && calculateCurrentDirection().equals(Direction.UP)) {
                 callFromOutsideCabinSet.remove(callFromOutsideCabinUp);
                 return true;
@@ -80,17 +80,32 @@ public class AutomatedControlModule {
     }
 
     private boolean removeDestinationIfReached() {
-        if(isCabinLevel() && (callFromWithinCabinQueue.peek().getSelectedFloor() == calculateCurrentFloor())) {
-            callFromWithinCabinQueue.poll();
-            return true;
+        if(isCabinLevel()) {
+            CallFromWithinCabin callFromWithinCabin = new CallFromWithinCabin((int) calculateCurrentFloor());
+            return callFromWithinCabinQueue.remove(callFromWithinCabin);
         } else {
             return false;
         }
     }
 
     private Direction calculateCurrentDirection() {
-        CallFromWithinCabin floor = callFromWithinCabinQueue.peek();
-        return (calculateFloorDistanceFromGround(floor.getSelectedFloor()) - cabinDistanceFromGround) > 0 ? Direction.UP : Direction.DOWN;
+        CallFromWithinCabin floor = null;
+        if(!callFromWithinCabinQueue.isEmpty()) {
+            floor = callFromWithinCabinQueue.iterator().next();
+            return (calculateFloorDistanceFromGround(floor.getSelectedFloor()) - cabinDistanceFromGround) > 0 ? Direction.UP : Direction.DOWN;
+        }
+        return (calculateFloorDistanceFromGround(findClosestCallFromOutside().getFloor()) - cabinDistanceFromGround) > 0 ? Direction.UP : Direction.DOWN;
+    }
+
+    private CallFromOutsideCabin findClosestCallFromOutside() {
+        int distance = Integer.MAX_VALUE;
+        CallFromOutsideCabin result = null;
+        for(CallFromOutsideCabin callFromOutsideCabin : callFromOutsideCabinSet) {
+            int distanceTillOutsideCall = callFromOutsideCabin.getDestinationFloor() - (int) calculateCurrentFloor();
+            if(Math.abs(distanceTillOutsideCall) < distance)
+                result = callFromOutsideCabin;
+        }
+        return result;
     }
 
     private boolean isCabinLevel() {

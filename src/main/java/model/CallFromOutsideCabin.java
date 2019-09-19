@@ -6,6 +6,7 @@ public class CallFromOutsideCabin {
 
     private Direction direction;
     private int floor;
+    private int destinationFloor;
 
     public CallFromOutsideCabin(Direction direction, int floor) {
         this.direction = direction;
@@ -18,6 +19,10 @@ public class CallFromOutsideCabin {
 
     public int getFloor() {
         return floor;
+    }
+
+    public int getDestinationFloor() {
+        return destinationFloor;
     }
 
     @Override

@@ -2,6 +2,12 @@ package model;
 
 public class Door {
 
+    public boolean open;
+
+    public boolean isOpen() {
+        return open;
+    }
+
     public void open() {
         try {
             System.out.println("opening the door");
